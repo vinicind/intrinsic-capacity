@@ -9,17 +9,17 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+##del(GA_assymetric_autoencoder)
 from genetic_algorithm import GA_assymetric_autoencoder
 import tensorflow as tf
 import numpy as np
-from keras.utils.vis_utils import plot_model
 
 from tensorflow.keras.layers import Flatten,Dense,Input,Reshape
 from tensorflow.keras.models import Sequential
 from random import randrange
 
 
-df = pd.read_csv('Data/processed_df.csv')
+df = pd.read_csv('../Data/processed_df.csv')
 
 
 ci_map = {
@@ -68,7 +68,7 @@ DNA_parameter = [["tanh","softmax","relu","sigmoid","linear"],
 
 
 ga = GA_assymetric_autoencoder(
-    shape=X_train.shape[1],
+    shape=df_autoencoder.shape[1],
     coding_size=2, 
     X_train=X_train_scaled, 
     X_test=X_val_scaled, 

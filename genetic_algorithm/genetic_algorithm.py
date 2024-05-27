@@ -18,7 +18,6 @@ import sys
 
 import tensorflow as tf
 import numpy as np
-from keras.utils.vis_utils import plot_model
 
 from tensorflow.keras.layers import Flatten,Dense,Input,Reshape
 from tensorflow.keras.models import Sequential
@@ -51,7 +50,7 @@ class GA_assymetric_autoencoder:
         code = architecture['code'][0]
         
         
-        input_layer = Input(shape=encoder_arch[0].neurons, name='input')
+        input_layer = Input((encoder_arch[0].neurons, ), name='input')
         encoder_layer = input_layer
         arch_size = len(architecture)
         # Encoder layers
@@ -212,9 +211,10 @@ class GA_assymetric_autoencoder:
             'decoder':   new_decoder + [ae1['decoder'][-1]]
         }
         
-    def mutate(self, ae):
-        while True:
+    def mutate(self, ae, max_try=100):
+        while max_try:
             # Gerar fator de mutação
+            max_try -= 1
             encoder = ae['encoder'][1:]
         
             decoder = ae['decoder'][:-1]
@@ -252,6 +252,7 @@ class GA_assymetric_autoencoder:
                 'code': ae['code'],
                 'decoder':   new_decoder + [ae['decoder'][-1]]
             }
+        return ae
         
     def GA(self, population, n_generations = 100, mutation_rate=0.2,Crossover=True,Mutation=True):
 
@@ -336,6 +337,7 @@ class GA_assymetric_autoencoder:
             
             if Mutation:
                 if np.random.rand() < mutation_rate:  
+                    print('Mutating...')
                     second_best_child = self.mutate(second_best_child)    
                     print("Second Best Child Mutate: ")
                     self.print_architecture(second_best_child)

@@ -1,0 +1,12 @@
+------------------------------
+15 None
+48 relu
+48 relu
+48 relu
+28 linear
+2 relu
+5 relu
+8 sigmoid
+15 linear
+optimizer adam
+------------------------------
