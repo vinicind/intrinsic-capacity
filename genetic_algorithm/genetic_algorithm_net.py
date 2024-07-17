@@ -2,7 +2,7 @@
 from sklearn.metrics import r2_score
 import copy
 import operator
-from tensorflow.keras.losses import BinaryCrossentropy, BinaryFocalCrossentropy
+from tensorflow.keras.losses import BinaryCrossentropy, BinaryFocalCrossentropy, CategoricalCrossentropy
 import random
 import pandas as pd
 import keras.metrics as metrics
@@ -17,20 +17,65 @@ from sklearn.decomposition import PCA
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 import sys
-
+from sklearn.model_selection import StratifiedKFold
 import tensorflow as tf
 import numpy as np
-
+from tensorflow.keras import backend as K
 from tensorflow.keras.layers import Flatten,Dense,Input,Reshape
 from tensorflow.keras.models import Sequential
 from random import randrange
 
+
+
+class F1Score(tf.keras.metrics.Metric):
+    def __init__(self, name='f1_score', **kwargs):
+        super(F1Score, self).__init__(name=name, **kwargs)
+        self.precision = tf.keras.metrics.Precision()
+        self.recall = tf.keras.metrics.Recall()
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        self.precision.update_state(y_true, y_pred, sample_weight)
+        self.recall.update_state(y_true, y_pred, sample_weight)
+
+    def result(self):
+        p = self.precision.result()
+        r = self.recall.result()
+        return 2 * ((p * r) / (p + r + tf.keras.backend.epsilon()))
+
+    def reset_states(self):
+        self.precision.reset_states()
+        self.recall.reset_states()
+
+# class CorrectPredictionsPerClass(tf.keras.metrics.Metric):
+#     def __init__(self, num_classes, name='correct_predictions_per_class', **kwargs):
+#         super(CorrectPredictionsPerClass, self).__init__(name=name, **kwargs)
+#         self.num_classes = num_classes
+#         self.correct_predictions = self.add_weight(shape=(num_classes,), name='cp', initializer='zeros')
+
+#     def update_state(self, y_true, y_pred, sample_weight=None):
+#         y_true = tf.argmax(y_true, axis=1)
+#         y_pred = tf.argmax(y_pred, axis=1)
+#         for class_id in range(self.num_classes):
+#             class_true = tf.cast(tf.equal(y_true, class_id), self.dtype)
+#             class_pred = tf.cast(tf.equal(y_pred, class_id), self.dtype)
+#             correct = tf.cast(tf.logical_and(class_true, class_pred), self.dtype)
+#             if sample_weight is not None:
+#                 correct = tf.multiply(correct, sample_weight)
+#             self.correct_predictions[class_id].assign_add(tf.reduce_sum(correct))
+
+#     def result(self):
+#         return self.correct_predictions
+
+#     def reset_states(self):
+#         self.correct_predictions.assign(tf.zeros_like(self.correct_predictions))
 
 class architecture:
     def __init__(self, neurons=None, activation=None, optimizer=None):
         self.neurons = neurons
         self.activation = activation
         self.optimizer = optimizer
+
+
 
 
 class GA:
@@ -43,10 +88,13 @@ class GA:
         self.y_train = y_train
         self.y_test = y_test
         
+        self.classes = len(y_train.unique())
+        
         self.activations = DNA_parameter[0]
         self.optimizers = DNA_parameter[1]
         self.epochs = epochs
-        
+    
+
     
     #This one shows the real numbers of neurons instead of percentage
     
@@ -81,11 +129,13 @@ class GA:
             autoencoder = Model(input_layer, encoder_output)
         # Compile the model
         
-        loss = BinaryFocalCrossentropy(gamma=2.0, alpha=0.25)
+        
+        if self.classes > 2:
+            loss = CategoricalCrossentropy()
+        else:
+            loss = BinaryFocalCrossentropy(gamma=2.0, alpha=0.25)
         autoencoder.compile(optimizer=decoder_arch[-1].optimizer, loss=loss, metrics=[
-            'accuracy',
-            metrics.Recall(name='recall'),
-            metrics.Precision(name='precision')
+            'accuracy'
         ])
 
         return autoencoder
@@ -99,18 +149,29 @@ class GA:
         print('-'*30)
         
     def train(self, model):
-        model.fit(self.X_train, self.y_train, 
+        kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    
+        # List to store results for each fold
+        results = []
+        
+        for train_index, test_index in kfold.split(self.X_train, self.y_train):
+            X_train_fold, X_test_fold = self.X_train[train_index], self.X_train[test_index]
+            y_train_fold, y_test_fold = self.y_train[train_index], self.y_train[test_index]
+            
+            # Fit the model
+            model.fit(X_train_fold, y_train_fold, 
             epochs= self.epochs, 
             verbose=0,
-            batch_size=32, validation_split=0.2)
+            batch_size=32)
+            
+            # Evaluate the model
+            scores = model.evaluate(X_test_fold, y_test_fold)
+            results.append(scores)
+
+        mean_accuracy = np.mean([result[1] for result in results])
+        # mean_f1 = np.mean([result[2] for result in results])
         
-        # Evaluate the model
-        loss, accuracy, precision, recall = model.evaluate(self.X_test, self.y_test)
-        if precision > 0 and recall > 0:
-            f1 = (2*precision*recall)/(precision+recall)
-        else:
-            f1 = 0
-        return accuracy, f1, precision, recall, model
+        return mean_accuracy, model
     
     def create_population(
         self, 
@@ -269,27 +330,21 @@ class GA:
                     'i': sel_index[0],
                     'acc': P1_model_trained[0],
                     'f1': P1_model_trained[1],
-                    'precision': P1_model_trained[2],
-                    'recall': P1_model_trained[3],
-                    'm': P1_model_trained[4]
+                    'm': P1_model_trained[2]
                 },
                 {
                     'p': P2,
                     'i': sel_index[1],
                     'acc': P2_model_trained[0],
                     'f1': P2_model_trained[1],
-                    'precision': P2_model_trained[2],
-                    'recall': P2_model_trained[3],
-                    'm': P2_model_trained[4]
+                    'm': P2_model_trained[2]
                 },
                 {
                     'p': P3,
                     'i': sel_index[2],
                     'acc': P3_model_trained[0],
                     'f1': P3_model_trained[1],
-                    'precision': P3_model_trained[2],
-                    'recall': P3_model_trained[3],
-                    'm': P3_model_trained[4]
+                    'm': P3_model_trained[2]
                 }
             ]
 

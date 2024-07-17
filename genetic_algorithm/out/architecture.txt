@@ -1,12 +1,8 @@
 ------------------------------
 15 None
-48 relu
-48 relu
-48 relu
-28 linear
-2 relu
-5 relu
-8 sigmoid
-15 linear
-optimizer adam
+2 softmax
+1 sigmoid
+optimizer sgd
 ------------------------------
+Best result in generation (f1) 0.49185667018539186
+Best result in generation (acc) 0.77440345287323
