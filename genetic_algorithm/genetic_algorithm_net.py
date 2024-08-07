@@ -2,7 +2,7 @@
 from sklearn.metrics import r2_score
 import copy
 import operator
-from tensorflow.keras.losses import BinaryCrossentropy, BinaryFocalCrossentropy, CategoricalCrossentropy
+from tensorflow.keras.losses import BinaryCrossentropy, BinaryFocalCrossentropy, SparseCategoricalCrossentropy
 import random
 import pandas as pd
 import keras.metrics as metrics
@@ -131,7 +131,7 @@ class GA:
         
         
         if self.classes > 2:
-            loss = CategoricalCrossentropy()
+            loss = SparseCategoricalCrossentropy()
         else:
             loss = BinaryFocalCrossentropy(gamma=2.0, alpha=0.25)
         autoencoder.compile(optimizer=decoder_arch[-1].optimizer, loss=loss, metrics=[
@@ -171,7 +171,7 @@ class GA:
         mean_accuracy = np.mean([result[1] for result in results])
         # mean_f1 = np.mean([result[2] for result in results])
         
-        return mean_accuracy, model
+        return mean_accuracy, 0, model
     
     def create_population(
         self, 
@@ -206,8 +206,12 @@ class GA:
             code_layer = architecture(neurons=self.code_size, activation=np.random.choice(self.activations)) # Latent dimension
             
 
-        
-            the_architecture_decoder.append(architecture(neurons=1, activation='sigmoid', optimizer=np.random.choice(self.optimizers)))
+            if self.classes > 2:
+                the_architecture_decoder.append(architecture(neurons=self.classes, activation='softmax', optimizer=np.random.choice(self.optimizers)))
+            else:   
+                the_architecture_decoder.append(architecture(neurons=1, activation='sigmoid', optimizer=np.random.choice(self.optimizers)))
+            
+            
             architectures.append({
             'encoder': the_architecture_encoder,
             'code': [code_layer],
@@ -349,7 +353,7 @@ class GA:
             ]
 
             # Sort models based on fitness scores in descending order (higher is better, adjust if necessary)
-            sorted_fitness = sorted(fitness_scores, key=lambda x: x['f1'], reverse=True)
+            sorted_fitness = sorted(fitness_scores, key=lambda x: x['acc'], reverse=True)
 
             # Get best, second best, and worst performing models
             best = sorted_fitness[0]['p']  # Best
@@ -406,7 +410,7 @@ class GA:
     
     def save_best_model_and_architecture(self, results):
     # Find the result with the best score
-        best_result = max(results, key=lambda x: x['f1'])
+        best_result = max(results, key=lambda x: x['acc'])
         print(best_result)
         # Save the Keras model
         model = best_result['m']
