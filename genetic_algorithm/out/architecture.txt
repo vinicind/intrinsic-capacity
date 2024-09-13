@@ -1,8 +1,9 @@
 ------------------------------
 15 None
-2 softmax
-1 sigmoid
+7 relu
+2 linear
+3 softmax
 optimizer sgd
 ------------------------------
-Best result in generation (f1) 0.49185667018539186
-Best result in generation (acc) 0.77440345287323
+Best result in generation (f1) 0
+Best result in generation (acc) 0.5751638293266297
