@@ -81,14 +81,14 @@ class architecture:
 class GA:
     def __init__(self, coding_size, X_train, X_test, y_train, y_test, DNA_parameter, epochs):
         self.shape = X_train.shape[1]
-        self.target_shape = len(y_train.unique())
+        self.target_shape = len(np.unique(y_train))
         self.code_size = coding_size
         self.X_train = X_train
         self.X_test = X_test
         self.y_train = y_train
         self.y_test = y_test
         
-        self.classes = len(y_train.unique())
+        self.classes = len(np.unique(y_train))
         
         self.activations = DNA_parameter[0]
         self.optimizers = DNA_parameter[1]
