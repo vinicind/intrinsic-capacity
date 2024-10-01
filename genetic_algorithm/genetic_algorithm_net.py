@@ -25,15 +25,16 @@ from tensorflow.keras.layers import Flatten,Dense,Input,Reshape
 from tensorflow.keras.models import Sequential
 from random import randrange
 
-
-
 class F1Score(tf.keras.metrics.Metric):
     def __init__(self, name='f1_score', **kwargs):
         super(F1Score, self).__init__(name=name, **kwargs)
         self.precision = tf.keras.metrics.Precision()
         self.recall = tf.keras.metrics.Recall()
-
     def update_state(self, y_true, y_pred, sample_weight=None):
+        if y_pred.shape[-1] > 1:
+            y_pred= tf.argmax(y_pred, axis=1)
+        else:
+            y_pred = tf.round(y_pred)
         self.precision.update_state(y_true, y_pred, sample_weight)
         self.recall.update_state(y_true, y_pred, sample_weight)
 
@@ -46,28 +47,36 @@ class F1Score(tf.keras.metrics.Metric):
         self.precision.reset_states()
         self.recall.reset_states()
 
-# class CorrectPredictionsPerClass(tf.keras.metrics.Metric):
-#     def __init__(self, num_classes, name='correct_predictions_per_class', **kwargs):
-#         super(CorrectPredictionsPerClass, self).__init__(name=name, **kwargs)
-#         self.num_classes = num_classes
-#         self.correct_predictions = self.add_weight(shape=(num_classes,), name='cp', initializer='zeros')
-
-#     def update_state(self, y_true, y_pred, sample_weight=None):
-#         y_true = tf.argmax(y_true, axis=1)
-#         y_pred = tf.argmax(y_pred, axis=1)
-#         for class_id in range(self.num_classes):
-#             class_true = tf.cast(tf.equal(y_true, class_id), self.dtype)
-#             class_pred = tf.cast(tf.equal(y_pred, class_id), self.dtype)
-#             correct = tf.cast(tf.logical_and(class_true, class_pred), self.dtype)
-#             if sample_weight is not None:
-#                 correct = tf.multiply(correct, sample_weight)
-#             self.correct_predictions[class_id].assign_add(tf.reduce_sum(correct))
-
-#     def result(self):
-#         return self.correct_predictions
-
-#     def reset_states(self):
-#         self.correct_predictions.assign(tf.zeros_like(self.correct_predictions))
+class Recall(tf.keras.metrics.Metric):
+    def __init__(self, name='recall', **kwargs):
+        super(Recall, self).__init__(name=name, **kwargs)
+        self.recall = tf.keras.metrics.Recall()
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        if y_pred.shape[-1] > 1:
+            y_pred = tf.argmax(y_pred, axis=-1)
+        else:
+            y_pred = tf.round(y_pred)
+        self.recall.update_state(y_true, y_pred, sample_weight)
+    def result(self):
+        r = self.recall.result()
+        return r
+    def reset_states(self):
+        self.recall.reset_states()
+class Precision(tf.keras.metrics.Metric):
+    def __init__(self, name='precision', **kwargs):
+        super(Precision, self).__init__(name=name, **kwargs)
+        self.precision = tf.keras.metrics.Precision()
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        if y_pred.shape[-1] > 1:
+            y_pred = tf.argmax(y_pred, axis=-1)
+        else:
+            y_pred = tf.round(y_pred)
+        self.precision.update_state(y_true, y_pred, sample_weight)
+    def result(self):
+        p = self.precision.result()
+        return p
+    def reset_states(self):
+        self.precision.reset_states()
 
 class architecture:
     def __init__(self, neurons=None, activation=None, optimizer=None):
