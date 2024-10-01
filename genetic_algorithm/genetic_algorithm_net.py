@@ -232,8 +232,7 @@ class GA:
         # Verifica se o decoder é válido: cresce até a última camada
         return all(
             (decoder[i].neurons < decoder[i+1].neurons)
-            and decoder[i].neurons > min_neurons and decoder[i+1].neurons > min_neurons
-            and decoder[i].neurons < max_neurons and decoder[i+1].neurons < max_neurons
+            and decoder[i].neurons > min_neurons and decoder[i+1].neurons < max_neurons
             for i in range(len(decoder) - 1)
         )
 
