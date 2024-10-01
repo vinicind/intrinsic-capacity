@@ -32,8 +32,11 @@ class F1Score(tf.keras.metrics.Metric):
         super(F1Score, self).__init__(name=name, **kwargs)
         self.precision = tf.keras.metrics.Precision()
         self.recall = tf.keras.metrics.Recall()
-
     def update_state(self, y_true, y_pred, sample_weight=None):
+        if y_pred.shape[-1] > 1:
+            y_pred= tf.argmax(y_pred, axis=1)
+        else:
+            y_pred = tf.round(y_pred)
         self.precision.update_state(y_true, y_pred, sample_weight)
         self.recall.update_state(y_true, y_pred, sample_weight)
 
@@ -46,28 +49,36 @@ class F1Score(tf.keras.metrics.Metric):
         self.precision.reset_states()
         self.recall.reset_states()
 
-# class CorrectPredictionsPerClass(tf.keras.metrics.Metric):
-#     def __init__(self, num_classes, name='correct_predictions_per_class', **kwargs):
-#         super(CorrectPredictionsPerClass, self).__init__(name=name, **kwargs)
-#         self.num_classes = num_classes
-#         self.correct_predictions = self.add_weight(shape=(num_classes,), name='cp', initializer='zeros')
-
-#     def update_state(self, y_true, y_pred, sample_weight=None):
-#         y_true = tf.argmax(y_true, axis=1)
-#         y_pred = tf.argmax(y_pred, axis=1)
-#         for class_id in range(self.num_classes):
-#             class_true = tf.cast(tf.equal(y_true, class_id), self.dtype)
-#             class_pred = tf.cast(tf.equal(y_pred, class_id), self.dtype)
-#             correct = tf.cast(tf.logical_and(class_true, class_pred), self.dtype)
-#             if sample_weight is not None:
-#                 correct = tf.multiply(correct, sample_weight)
-#             self.correct_predictions[class_id].assign_add(tf.reduce_sum(correct))
-
-#     def result(self):
-#         return self.correct_predictions
-
-#     def reset_states(self):
-#         self.correct_predictions.assign(tf.zeros_like(self.correct_predictions))
+class Recall(tf.keras.metrics.Metric):
+    def __init__(self, name='recall', **kwargs):
+        super(Recall, self).__init__(name=name, **kwargs)
+        self.recall = tf.keras.metrics.Recall()
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        if y_pred.shape[-1] > 1:
+            y_pred = tf.argmax(y_pred, axis=-1)
+        else:
+            y_pred = tf.round(y_pred)
+        self.recall.update_state(y_true, y_pred, sample_weight)
+    def result(self):
+        r = self.recall.result()
+        return r
+    def reset_states(self):
+        self.recall.reset_states()
+class Precision(tf.keras.metrics.Metric):
+    def __init__(self, name='precision', **kwargs):
+        super(Precision, self).__init__(name=name, **kwargs)
+        self.precision = tf.keras.metrics.Precision()
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        if y_pred.shape[-1] > 1:
+            y_pred = tf.argmax(y_pred, axis=-1)
+        else:
+            y_pred = tf.round(y_pred)
+        self.precision.update_state(y_true, y_pred, sample_weight)
+    def result(self):
+        p = self.precision.result()
+        return p
+    def reset_states(self):
+        self.precision.reset_states()
 
 class architecture:
     def __init__(self, neurons=None, activation=None, optimizer=None):
@@ -132,11 +143,19 @@ class GA:
         
         if self.classes > 2:
             loss = SparseCategoricalCrossentropy()
+            metric=[
+                'accuracy',
+                #F1Macro(),
+                F1Micro()
         else:
             loss = BinaryFocalCrossentropy(gamma=2.0, alpha=0.25)
-        autoencoder.compile(optimizer=decoder_arch[-1].optimizer, loss=loss, metrics=[
-            'accuracy'
-        ])
+              metric = [
+            'accuracy',
+            F1Score(),
+            Precision(),
+            Recall()]
+        autoencoder.compile(optimizer=decoder_arch[-1].optimizer, loss=loss, metrics=metric
+        )
 
         return autoencoder
     
@@ -169,9 +188,17 @@ class GA:
             results.append(scores)
 
         mean_accuracy = np.mean([result[1] for result in results])
+        if self.classes == 2:
+            mean_f1 = np.mean([result[2] for result in results])
+            mean_precision = np.mean([result[3] for result in results]) 
+            mean_recall = np.mean([result[4] for result in results])
+            return mean_accuracy, mean_f1, mean_precision, mean_recall, model
+        else:
+            mean_f1micro = np.mean([result[2] for result in results])
+            return mean_accuracy, model
         # mean_f1 = np.mean([result[2] for result in results])
         
-        return mean_accuracy, 0, model
+        return mean_accuracy, mean_f1micro, model
     
     def create_population(
         self, 
@@ -333,27 +360,34 @@ class GA:
                     'p': P1,
                     'i': sel_index[0],
                     'acc': P1_model_trained[0],
-                    'f1': P1_model_trained[1],
-                    'm': P1_model_trained[2]
+                    'f1': P1_model_trained[1], #aqui eh o f1 micro se for multiclass
+                    'precision': P1_model_trained[2] if self.classes == 2 else None,
+                    'recall': P1_model_trained[3] if self.classes == 2 else None,
+                    'm': P1_model_trained[-1]
                 },
                 {
                     'p': P2,
                     'i': sel_index[1],
                     'acc': P2_model_trained[0],
                     'f1': P2_model_trained[1],
-                    'm': P2_model_trained[2]
+                    'precision': P2_model_trained[2] if self.classes == 2 else None,
+                    'recall': P2_model_trained[3] if self.classes == 2 else None,
+                    'm': P2_model_trained[-1]
                 },
                 {
                     'p': P3,
                     'i': sel_index[2],
                     'acc': P3_model_trained[0],
                     'f1': P3_model_trained[1],
-                    'm': P3_model_trained[2]
+                    'precision': P3_model_trained[2] if self.classes == 2 else None,
+                    'recall': P3_model_trained[3] if self.classes == 2 else None,
+                    'm': P3_model_trained[-1]
                 }
             ]
 
+
             # Sort models based on fitness scores in descending order (higher is better, adjust if necessary)
-            sorted_fitness = sorted(fitness_scores, key=lambda x: x['acc'], reverse=True)
+            sorted_fitness = sorted(fitness_scores, key=lambda x: x['f1'], reverse=True)
 
             # Get best, second best, and worst performing models
             best = sorted_fitness[0]['p']  # Best
@@ -398,7 +432,8 @@ class GA:
             best_architecture.append(sorted_fitness[0])
             print('Best result in generation (f1)', sorted_fitness[0]['f1'] )
             print('Best result in generation (acc)',  sorted_fitness[0]['acc'])
-            
+            print('Best result in generation (precision)',  sorted_fitness[0]['precision']) if self.classes == 2 else None
+            print('Best result in generation (recall)',  sorted_fitness[0]['recall'])  if self.classes == 2 else None
             
            
 
@@ -410,7 +445,7 @@ class GA:
     
     def save_best_model_and_architecture(self, results):
     # Find the result with the best score
-        best_result = max(results, key=lambda x: x['acc'])
+        best_result = max(results, key=lambda x: x['f1'])
         print(best_result)
         # Save the Keras model
         model = best_result['m']
@@ -426,7 +461,8 @@ class GA:
                 self.print_architecture(architecture)
                 print('Best result in generation (f1)', best_result['f1'] )
                 print('Best result in generation (acc)',  best_result['acc'])
-            
+                print('Best result in generation (precision)',  best_result['precision'])
+                print('Best result in generation (recall)',  best_result['recall'])
             finally:
                 # Restore stdout
                 sys.stdout = original_stdout
